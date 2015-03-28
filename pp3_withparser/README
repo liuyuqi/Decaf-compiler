@@ -1,0 +1,117 @@
+CISC-672 2013 Fall 
+  Project PP3 Documentation
+
+Group Members: Wanzhu Chen, Yuqi Liu.
+
+-----------------
+Contents:
+-----------------
+0. Changes
+I. Data Structures
+II. Scoping Schemes
+III. Implementation of symbol table (first pass)
+IV. Implementation of symbol table (second pass)
+
+=================================
+=================================
+0. Changes:
+   Added semantic.h and semantic.cc to implement symbol table and active scope stack. 
+   Added Build functions in ast_decl.cc, ast_stmt.cc to build the symbol table and check conflicts in declaration.
+
+=================================
+I. Data Structures:
+------------------
+1. (in semantic.h)
+   Scope identifier: int scope;
+   Maximum scope recorder: int max_scope;
+
+2. (in semantic.h)
+   An Active Scope Stack (ASS):
+       implemented using doubly linked list. Aimed at recording which scope to return to in the exit_scope action.
+       for example: 
+
+    |    |           |    |            |    |
+    | P3 |<-top      |    |            | P4 |<-top
+    | P2 |           | P2 |<-top       | P2 |
+    | P1 |           | P1 |            | P1 |
+    ------    =>     ------     =>     ------  
+           (exit P3)        (enter P4)
+
+   Every entry in ASS should look like this:
+         ___________________________________
+   <--->| *last | scope | classname | *next |<--->
+         -----------------------------------
+    where classname is the name of the class "leading" the scope. Values of classname can be StmtBlock, ClassDecl, FnDecl and InterfaceDecl.
+
+3. (in semantic.h)
+   Symbol table items (Item):
+    A struct representing symbol table entries.
+
+        _____________________________
+    -->| name | type | scope | *next |-->
+        -----------------------------
+
+    name: a char* variable, the name of identifier/class/function/interface.
+    type: an optional variable.
+          For a variable declaration, it can be intType, doubleType, boolType
+       and stringType;
+          For a function declaration, it can be intType, doubleType, boolType,
+       stringType and voidType;
+          For a class and interface declaration, it is ignored.
+    scope: an int variable, the scope number of this declaration.
+    next: a pointer to the next item (a linked list), NULL if no following items.
+
+4. A linked list of items (symbol table), where the head pointer is STentry.
+
+
+=================================
+II. Scoping Schemes
+--------------------
+1. We use one integer value for each scope. The value grows from 0, which is the global scope, all the way up.
+
+2. No scope value can be identical, which means we need to assign a new value to a scope, which makes use of the max_scope variable.
+
+3. Enter_scope operation: 
+    a. create a new entry in the ASS (PUSH in the stack).
+    b. assign a new scope value for the new scope and record it.
+
+4. Exit_scope operation:
+    a. POP the first AS stack entry.
+    b. change the scope value to the new TOP stack entry of ASS.
+
+5. When to enter a new scope?
+    When met some nodes within a StmtBlock, a list of field in a class declaration, a list of prototype in a interface declaration, or a new function declaration with its attached StmtBlock.
+
+6. When to exit a scope?
+    When the traversal leaves a StmtBlock node (not attached to a function), a FieldList node, a ProtoList node, or a FnDecl node.
+    
+7. Lookup Scheme.
+    Static scoping. If declaration is not found in the local scope, always look it up in the global scope.
+
+=================================
+III. Implementation of symbol table (first pass):
+--------------------
+Traverse the AST (in-order).
+   If a declaration is found, then
+       check the symbol table for conflicts;
+       if no conflict, then
+           create the new entry;
+           assign the scope value;
+           insert a new entry in the symbol table (by linking);
+           create a double link from the node in AST to the item in the symbol table;
+       else error_msg (conflicts in declaration);
+
+
+=================================
+IV. Implementation of symbol table (second pass):
+--------------------
+Traverse the AST (in-order) again.
+   If usages is found, then
+       local_lookup the symbol table for declarations;
+       if found, then link the node of usage (in the AST) to the node of declaration (in the AST).
+       else do lookup, then
+           if found, then link the node of usage (in the AST) to the node of declaration (in the AST).
+       else error_msg (no declaration found).
+=================================
+
+The end.
